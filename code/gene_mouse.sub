@@ -1,0 +1,20 @@
+
+universe = vanilla
+log = log/gene_mouse.log
+error = error/gene_mouse-chtc_$(Cluster)_$(Process).err
+
+executable = ./gene_mouse.sh
+
+arguments = LDLR_mouse.txt  $(Process)
+output = output/gene_mouse-chtc_$(Cluster)_$(Process).out
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files = http://proxy.chtc.wisc.edu/SQUID/chtc/R361.tar.gz, packages.tar.gz, gene_mouse.R, LDLR_mouse.txt,liver_mouse$INT(Process).txt
+
+
+request_cpus = 1
+request_memory = 30GB
+request_disk = 10GB
+
+queue 10 

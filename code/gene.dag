@@ -1,0 +1,47 @@
+# This "gene.dag" script is a Directed Acyclic Graph Manager (DAGMan)
+# meta-scheduler. The code below specifies the following DAG:
+#
+#
+# (pre 1)  getData.sh
+#              |
+#              V
+# (job 1)  readData.sub
+#            / | \
+#   one parallel runs of readData.sh
+#            \ | /
+#              V
+# (job 2)  gene_human.sub
+#            / | \
+#   ten parallel runs of gene_human.sh
+#            \ | /
+#              V
+# (job 3)  gene_mouse.sub
+#            / | \
+#   ten parallel runs of gene_mouse.sh
+#            \ | /
+#              V
+# (post 3)  merge.sh
+#
+#
+# Note that "job 1" and "job 2" are each HTCondor job submission
+# scripts that will create several distributed jobs that run in
+# parallel.
+#
+# For more information, see
+# https://htcondor.readthedocs.io/en/v8_9_3/users-manual/dagman-applications.html
+#
+# Run "condor_submit_dag gene.dag" to cause all the code specified in
+# the DAG to run in the correct order.
+
+job 1 readData.sub
+job 2 gene_human.sub
+job 3 gene_mouse.sub
+
+script pre 1 getData.sh
+script post 3 merge.sh
+
+parent 1 child 2 3
+
+
+
+
