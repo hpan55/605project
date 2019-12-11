@@ -1,0 +1,147 @@
+---
+title: 'STAT605 Project Report: <br> Find potential cholesterol genes by using CHTC'
+author: Shuyang Chen(schen662), Xiyue Wang(xwang2342), Hongwei Pan(hpan55), Anne Huen
+  Wai Wong(awong43)
+date: "12/10/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Introduction 
+The purpose of our project is to find potential cholesterol genes using parallel computing through CHTC. Two different datasets, one is about human genes and one is about mouse genes are analyzed. We calculated biweight midcorrelation between gene "LDLR" and other genes, and defined highly correlated ones as potential cholesterol genes.
+
+# Data Description
+* Source: ARCHS4: https://amp.pharm.mssm.edu/archs4/download.html  
+* Size: R human_matrix.rda v7 (4.9GB), R mouse_matrix.rda v7(4.8GB)  
+
+These two datasets are gene expressions for 35,000 genes over 200,000 mouse samples and 16,000 human samples in rda format. Expressions of each gene over all the samples are stored as a row vector in a big matrix. During data cleaning process, since liver is the main organ that process cholesterol, we only select those liver samples to analyze and filter out some meta-information variables.  
+
+# Statistical Computation
+Intuitively, we think that genes which have similar distributions among samples may have similar functions. We consider measuring the similarity by calculating the correlation between a commonly known cholesterol gene "LDLR" and other genes, and select the most similar ones as potential cholesterol genes.  
+
+Our statistical computation is based on biweight midcorrelation, which is also called bicor. It is a measure of similarities between samples based on median. Compare with other metrics, for example, Pearson correlation which is based on mean, bicor is more robust and less sensitive to outliers.  
+
+Formulas to calcultate biweight midcorrelation are list follows, as shown in wikipedia:
+$$bicor(x,y) = \sum_{i=1}^m \tilde{x_i} \tilde{y_i}$$
+
+
+where $$\tilde{x_i} = \frac{(x_i - med(x))w_i^{(x)}} {\sqrt{\sum_{j=1}^m[(x_j - med(x))w_j^{(x)}]^2}}, \tilde{y_i} = \frac{(y_i - med(y))w_i^{(y)}} {\sqrt{\sum_{j=1}^m[(y_j - med(y))w_j^{(y)}]^2}}$$  
+and $$w_i^{(x)} = (1 - u_i^2)^2 I(1 - |u_i|), w_i^{(y)} = (1 - v_i^2)^2 I(1 - |v_i|)$$  
+$$u_i = \frac{x_i - med(x)}{9med(x)},   v_i = \frac{y_i - med(y)}{9med(y)}$$
+
+We use function `bicorAndPvalue()` in R package `WGCNA` to calculate biweight midcorrelation.  
+
+This flowchart shows what we do through CHTC:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(diagram)
+names <- c("getData.sh", "readData.sub(.sh/.R)", "gene_human.sub(.sh/.R)", "gene_mouse.sub(.sh/.R)", "merge.sh")
+M <- matrix(nrow = 5, ncol = 5, byrow = TRUE, data = 0)
+M[3, 2] <- M[2, 1] <- M[4, 2] <- M[5, 3] <- M[5, 4] <-  ""
+plotmat(M, pos = c(1, 1, 2, 1), curve = 0, name = names, lwd = 1,
+         box.lwd = 2, cex.txt = 0.8, box.type = "rect", box.prop = 0.3)
+```
+
+Since our original data format is Rda, R, instead of shell command, helps us split every file into ten smaller txt files to do parallel computing through CHTC. After we write out new files, bicorrelation coefficient, p-value between LDLR and other genes are calculated respectively. No matter the coefficient is positive or negative, only the absolute value influence the relevance we want to know.  
+
+After parallel computing, we merge and sort to get two final files that contain coefficient and p-value of human and mouse in ascending order. Aim at highly correlated genes, which are potential cholesterol genes, we analyze them out of CHTC.  
+
+Finally, we select 10 genes that are highly correlated with LDLR, and make comparison plots.
+
+
+# Results
+
+
+The top 10 genes correlated with LDLR in human genes:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+setwd("C:\\Users\\pc\\Desktop\\605\\project")
+#Top 10 genes correlated with LDLR in human genes:
+human_best <- read.csv("human_best100.csv")
+names(human_best)=c("LDLR","gene","bicorrelation","p-value")
+head(human_best[,-1],10)
+```
+
+The top 10 genes correlated with LDLR in mouse genes:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Top 10 genes correlated with LDLR in mouse genes:
+mouse_best <- read.csv("mouse_best100.csv")
+names(mouse_best)=c("LDLR","gene","bicorrelation","p-value")
+head(mouse_best[,-1],10)
+```
+
+Plots for top 10 genes compared with LDLR in human genes:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+setwd("./data")
+library(reshape2)
+library(stringr)
+library(dplyr)
+library(data.table)
+# library(WGCNA)
+corplot = function(target,compare){
+  LDLR <- read.table(paste0(target,".txt"),header = FALSE,sep = "\t")
+  x <- t(LDLR[,-1])
+  data <- read.table(paste0(compare,".txt"),header = FALSE,sep = "\t")
+  y <- t(data[,-1])
+  plot(x,type="h",col="blue",ylab="expression of genes",xlab="samples",main=paste0("Genes of ",target," and ", compare),cex.main=.8)
+  lines(y,type="h",col="red")
+  legend("topright",legend = c(target,compare),col=c("blue",col="red"),lty = c(1,1),cex=.6)
+  
+}
+par(mfrow=c(2,2))
+corplot("LDLR_human","SND1_human")
+corplot("LDLR_human","VCP_human")
+corplot("LDLR_human","PHB2_human")
+corplot("LDLR_human","FKBP4_human")
+corplot("LDLR_human","PITRM1_human")
+corplot("LDLR_human","AFG3L2_human")
+corplot("LDLR_human","IMMT_human")
+corplot("LDLR_human","FAF2_human")
+corplot("LDLR_human","PSMD3_human")
+corplot("LDLR_human","MAPKAP1_human")
+```
+
+Plots for top 10 genes compared with LDLR in mouse genes:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+setwd("./data")
+par(mfrow=c(2,2))
+corplot("LDLR_mouse","AKAP1_mouse")
+corplot("LDLR_mouse","ACO1_mouse")
+corplot("LDLR_mouse","ZFYVE1_mouse")
+corplot("LDLR_mouse","PEX5_mouse")
+corplot("LDLR_mouse","CDS2_mouse")
+corplot("LDLR_mouse","HECTD3_mouse")
+corplot("LDLR_mouse","VAV2_mouse")
+corplot("LDLR_mouse","D17WSU92E_mouse")
+corplot("LDLR_mouse","RAB5B_mouse")
+corplot("LDLR_mouse","TRAK1_mouse")
+
+
+```
+
+Descrptions of some genes correlated with LDLR:
+
+VCP: Valosin-containing protein (VCP) is important for the cholesterol-accelerated degradation.
+^[Ngee Kiat Chua, Nicola A. Scott, Andrew J. Brown; Valosin-containing protein mediates the ERAD of squalene monooxygenase and its cholesterol-responsive degron. Biochem J 30 September 2019; 476 (18): 2545–2560.]
+
+IMMT: Encoded mitochondrial inner membrane protein. And oxidation helps the process of building up cholesterol. 
+^[Chinese Journal of Cell Biology:1-8[2019-12-10]]
+
+Although p-values and plots seem good, part of the reason is that huge amounts of samples are used in calculation. And due to the lack of biological knowledge, there might be other influence factors that are able to decide the expression of genes but we don't know. It’s difficult for us to verify whether there is any actual meaning for our findings.
+
+
+# Conclusion
+
+* There might be probability to narrow relevant genes down by finding highly correlated genes.
+
+* There is obvious difference between the LDLR gene of human and mouse.
+
+* Our results may be used to build gene modules and to make network inferences in the future.
+
+
+
+
